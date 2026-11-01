@@ -63,7 +63,15 @@ kubectl apply -k config/
 
 Image: `ghcr.io/ferrix/capturing:1.0.0` (linux/arm64 + linux/amd64). Arm64 builds on `runs-on: turos-arm64-capturing`.
 
-Releases are Git tags `vX.Y.Z` (start `v1.0.0`). CI publishes `ghcr.io/ferrix/capturing:X.Y.Z`, `:X.Y`, `:X`, and a GitHub Release. Bump `config/default` `images.newTag` with the version.
+Versions are **semantic-release** on `main` from conventional commits (current baseline **v1.0.0**):
+
+| Commit | Release |
+|--------|---------|
+| `fix:` | patch (`1.0.1`) |
+| `feat:` | minor (`1.1.0`) |
+| `feat!:` / `BREAKING CHANGE:` | major (`2.0.0`) |
+
+CI writes `CHANGELOG.md`, tags `vX.Y.Z`, GitHub Release, GHCR `:X.Y.Z` / `:X.Y` / `:X`, and bumps GitOps `images.newTag`. `chore(release):` commits use `[skip ci]`.
 
 ## License
 

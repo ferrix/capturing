@@ -1,4 +1,6 @@
 /bin
+/node_modules
+package-lock.json
 /cover.out
 /cover.html
 *.exe
