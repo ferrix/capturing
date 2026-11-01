@@ -239,6 +239,71 @@ func TestMachineFlashHTTPStatus(t *testing.T) {
 	}
 }
 
+func TestMachineHonorsPresetProviderID(t *testing.T) {
+	board := startBMC(t)
+	ns := "default"
+	machine := tpiMachine(ns, "n1", 1)
+	machine.Spec.ProviderID = "turingpi://10.88.0.11/node/1"
+	c := fakeClient(t, infraCluster(ns, "infra", board.URL()), credSecret(ns), capiCluster(ns, "infra"), capiMachine(ns, "n1"), machine)
+	r := &MachineReconciler{Client: c, BMCOptions: pollOpt()}
+	if _, err := r.Reconcile(context.Background(), req(ns, "n1")); err != nil {
+		t.Fatal(err)
+	}
+	got := &infrav1.TuringPiMachine{}
+	if err := c.Get(context.Background(), types.NamespacedName{Namespace: ns, Name: "n1"}, got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Spec.ProviderID != "turingpi://10.88.0.11/node/1" {
+		t.Fatalf("providerID overwritten: %q", got.Spec.ProviderID)
+	}
+}
+
+func TestMachineAdoptedDeleteDoesNotPowerOff(t *testing.T) {
+	board := startBMC(t)
+	board.SetPower(1, true)
+	ns := "default"
+	machine := tpiMachine(ns, "n1", 1)
+	machine.Annotations = map[string]string{infrav1.AdoptedAnnotation: "true"}
+	machine.Finalizers = []string{infrav1.MachineFinalizer}
+	now := metav1.Now()
+	machine.DeletionTimestamp = &now
+	c := fakeClient(t, infraCluster(ns, "infra", board.URL()), credSecret(ns), capiCluster(ns, "infra"), capiMachine(ns, "n1"), machine)
+	r := &MachineReconciler{Client: c, BMCOptions: pollOpt()}
+	if _, err := r.Reconcile(context.Background(), req(ns, "n1")); err != nil {
+		t.Fatal(err)
+	}
+	if !board.Power(1) {
+		t.Fatal("adopted delete must not power off")
+	}
+	if board.PowerSetCalls() != 0 {
+		t.Fatalf("power set calls = %d", board.PowerSetCalls())
+	}
+	got := &infrav1.TuringPiMachine{}
+	err := c.Get(context.Background(), types.NamespacedName{Namespace: ns, Name: "n1"}, got)
+	if err == nil && controllerutil.ContainsFinalizer(got, infrav1.MachineFinalizer) {
+		t.Fatal("finalizer remains")
+	}
+}
+
+func TestMachineAdoptedSkipsFlash(t *testing.T) {
+	board := startBMC(t)
+	ns := "default"
+	machine := tpiMachine(ns, "n1", 1)
+	machine.Annotations = map[string]string{infrav1.AdoptedAnnotation: "true"}
+	machine.Spec.ImageURL = "http://127.0.0.1:1/must-not-fetch.img"
+	c := fakeClient(t, infraCluster(ns, "infra", board.URL()), credSecret(ns), capiCluster(ns, "infra"), capiMachine(ns, "n1"), machine)
+	r := &MachineReconciler{Client: c, BMCOptions: pollOpt()}
+	if _, err := r.Reconcile(context.Background(), req(ns, "n1")); err != nil {
+		t.Fatal(err)
+	}
+	if board.FlashCalls() != 0 {
+		t.Fatal("adopted machine flashed")
+	}
+	if !board.Power(1) {
+		t.Fatal("expected power on")
+	}
+}
+
 func TestMachineDeletePowersOff(t *testing.T) {
 	board := startBMC(t)
 	board.SetPower(3, true)

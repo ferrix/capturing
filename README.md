@@ -51,6 +51,18 @@ spec:
 
 Secret keys: `username`, `password`.
 
+## Adopt an existing node
+
+Set `capturing.infrastructure.cluster.x-k8s.io/adopted: "true"` on the `TuringPiMachine`. CAPTuring will not flash, will power the slot on if it is off, and **will not power off** when the object is deleted.
+
+Install in-cluster:
+
+```bash
+kubectl apply -k config/
+```
+
+Image: `ghcr.io/ferrix/capturing`.
+
 ## License
 
 MIT

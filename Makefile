@@ -19,7 +19,7 @@ generate:
 		object:headerFile=hack/boilerplate.go.txt paths=./api/...
 	go run sigs.k8s.io/controller-tools/cmd/controller-gen@v0.23.0 \
 		crd:crdVersions=v1 \
-		rbac:roleName=manager-role \
+		rbac:roleName=capturing-manager-role \
 		paths=./... \
 		output:crd:artifacts:config=config/crd/bases \
 		output:rbac:artifacts:config=config/rbac

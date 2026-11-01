@@ -38,6 +38,13 @@ const (
 	reasonProvisioned    = "Provisioned"
 )
 
+func isAdopted(obj metav1.Object) bool {
+	if obj == nil {
+		return false
+	}
+	return obj.GetAnnotations()[infrav1.AdoptedAnnotation] != ""
+}
+
 func isPaused(cluster *clusterv1.Cluster, obj metav1.Object) bool {
 	if obj != nil && obj.GetAnnotations()[clusterv1.PausedAnnotation] != "" {
 		return true

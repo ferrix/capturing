@@ -16,6 +16,10 @@ const (
 	// MachineFinalizer allows TuringPiMachineReconciler to power off a node
 	// before removing the object from the API server.
 	MachineFinalizer = "turingpimachine.infrastructure.cluster.x-k8s.io"
+
+	// AdoptedAnnotation marks a TuringPiMachine as an existing node. Delete
+	// removes the finalizer only; the BMC is not powered off. Flash is skipped.
+	AdoptedAnnotation = "capturing.infrastructure.cluster.x-k8s.io/adopted"
 )
 
 // TuringPiMachineSpec defines the desired state of TuringPiMachine.

@@ -119,7 +119,7 @@ func (r *MachineReconciler) reconcile(ctx context.Context, machine *infrav1.Turi
 	}
 
 	provisioned := ptr.Deref(machine.Status.Initialization.Provisioned, false)
-	if !provisioned && machine.Spec.ImageURL != "" {
+	if !provisioned && machine.Spec.ImageURL != "" && !isAdopted(machine) {
 		if err := r.flash(ctx, bmcClient, machine); err != nil {
 			setReady(&machine.Status.Conditions, machine.Generation, false, reasonFlashFailed, err.Error())
 			return ctrl.Result{}, err
@@ -131,13 +131,20 @@ func (r *MachineReconciler) reconcile(ctx context.Context, machine *infrav1.Turi
 		return ctrl.Result{}, err
 	}
 
-	machine.Spec.ProviderID = bmc.ProviderID(infra.Spec.BMC.URL, machine.Spec.Node)
+	if machine.Spec.ProviderID == "" {
+		machine.Spec.ProviderID = bmc.ProviderID(infra.Spec.BMC.URL, machine.Spec.Node)
+	}
 	machine.Status.Initialization.Provisioned = ptr.To(true)
 	setReady(&machine.Status.Conditions, machine.Generation, true, reasonProvisioned, "node powered on")
 	return ctrl.Result{}, nil
 }
 
 func (r *MachineReconciler) reconcileDelete(ctx context.Context, machine *infrav1.TuringPiMachine, bmcClient *bmc.HTTPClient) (ctrl.Result, error) {
+	if isAdopted(machine) {
+		setReady(&machine.Status.Conditions, machine.Generation, false, reasonDeleting, "adopted: skip power off")
+		controllerutil.RemoveFinalizer(machine, infrav1.MachineFinalizer)
+		return ctrl.Result{}, nil
+	}
 	setReady(&machine.Status.Conditions, machine.Generation, false, reasonDeleting, "powering off")
 	if machine.Spec.Node >= 1 && machine.Spec.Node <= 4 {
 		if err := bmcClient.PowerSet(ctx, machine.Spec.Node, false); err != nil {

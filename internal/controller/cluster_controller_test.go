@@ -251,6 +251,20 @@ func TestClusterOwnerRefWithoutLabel(t *testing.T) {
 	}
 }
 
+func TestIsAdopted(t *testing.T) {
+	if isAdopted(nil) {
+		t.Fatal("nil is not adopted")
+	}
+	m := tpiMachine("ns", "n1", 1)
+	if isAdopted(m) {
+		t.Fatal("unannotated")
+	}
+	m.Annotations = map[string]string{infrav1.AdoptedAnnotation: "true"}
+	if !isAdopted(m) {
+		t.Fatal("expected adopted")
+	}
+}
+
 func TestIsPausedClusterAnnotation(t *testing.T) {
 	cluster := capiCluster("ns", "infra")
 	cluster.Annotations = map[string]string{clusterv1.PausedAnnotation: "true"}
