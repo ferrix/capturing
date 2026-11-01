@@ -20,7 +20,7 @@ spec:
       serviceAccountName: capturing-controller-manager
       containers:
         - name: manager
-          image: ghcr.io/ferrix/capturing:latest
+          image: ghcr.io/ferrix/capturing:1.0.0
           args:
             - --metrics-bind-address=:8080
             - --health-probe-bind-address=:8081

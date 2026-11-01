@@ -3,6 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ["v*.*.*"]
   pull_request:
 
 jobs:
@@ -17,7 +18,7 @@ jobs:
         run: make test
 
   image-arm64:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: test
     runs-on: turos-arm64-capturing
     permissions:
@@ -34,11 +35,10 @@ jobs:
         run: |
           docker buildx build --builder turos --platform linux/arm64 --push \
             -t "ghcr.io/ferrix/capturing:${{ github.sha }}-arm64" \
-            -t ghcr.io/ferrix/capturing:latest-arm64 \
             .
 
   image-amd64:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -59,14 +59,13 @@ jobs:
           platforms: linux/amd64
           tags: |
             ghcr.io/ferrix/capturing:${{ github.sha }}-amd64
-            ghcr.io/ferrix/capturing:latest-amd64
 
   image:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: [image-arm64, image-amd64]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: docker/login-action@v3
@@ -76,9 +75,29 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/setup-buildx-action@v3
       - name: Create multi-arch tags
+        env:
+          SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
+          IMG=ghcr.io/ferrix/capturing
+          tags=(-t "${IMG}:${SHA}")
+          if [[ "${REF}" == refs/heads/main ]]; then
+            tags+=(-t "${IMG}:latest")
+          fi
+          if [[ "${REF}" == refs/tags/v* ]]; then
+            ver="${REF_NAME#v}"
+            tags+=(-t "${IMG}:${ver}" -t "${IMG}:v${ver}")
+            IFS=. read -r major minor patch <<<"${ver}"
+            tags+=(-t "${IMG}:${major}.${minor}" -t "${IMG}:${major}")
+          fi
           docker buildx imagetools create \
-            -t "ghcr.io/ferrix/capturing:${{ github.sha }}" \
-            -t ghcr.io/ferrix/capturing:latest \
-            "ghcr.io/ferrix/capturing:${{ github.sha }}-arm64" \
-            "ghcr.io/ferrix/capturing:${{ github.sha }}-amd64"
+            "${tags[@]}" \
+            "${IMG}:${SHA}-arm64" \
+            "${IMG}:${SHA}-amd64"
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --generate-notes --verify-tag

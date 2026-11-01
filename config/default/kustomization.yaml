@@ -8,4 +8,4 @@ resources:
   - ../manager
 images:
   - name: ghcr.io/ferrix/capturing
-    newTag: latest
+    newTag: "1.0.0"
