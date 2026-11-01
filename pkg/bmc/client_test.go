@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -226,6 +227,19 @@ func TestWithInsecureSkipVerify(t *testing.T) {
 	c := bmc.New("https://example.invalid", "root", "turing", bmc.WithInsecureSkipVerify())
 	if c.HTTP == nil || c.HTTP.Transport == nil {
 		t.Fatal("expected transport")
+	}
+	tr, ok := c.HTTP.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if tr.ForceAttemptHTTP2 {
+		t.Fatal("BMC client must not attempt HTTP/2")
+	}
+	if len(tr.TLSNextProto) != 0 {
+		t.Fatal("TLSNextProto must be empty to disable HTTP/2")
+	}
+	if tr.TLSClientConfig == nil || !tr.TLSClientConfig.InsecureSkipVerify {
+		t.Fatal("expected InsecureSkipVerify")
 	}
 }
 

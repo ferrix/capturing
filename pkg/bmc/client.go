@@ -62,23 +62,40 @@ func WithHTTPClient(c *http.Client) Option {
 	return func(h *HTTPClient) { h.HTTP = c }
 }
 
+// http1Transport disables HTTP/2. Turing Pi BMC TLS does not advertise ALPN and
+// answers with HTTP/2 SETTINGS frames that break Go's default HTTP/1.1 parser.
+func http1Transport() *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.ForceAttemptHTTP2 = false
+	t.TLSNextProto = map[string]func(authority string, c *tls.Conn) http.RoundTripper{}
+	return t
+}
+
+func applyHTTP1(tr *http.Transport) *http.Transport {
+	tr.ForceAttemptHTTP2 = false
+	tr.TLSNextProto = map[string]func(authority string, c *tls.Conn) http.RoundTripper{}
+	return tr
+}
+
 // WithInsecureSkipVerify skips TLS verification.
 func WithInsecureSkipVerify() Option {
 	return func(h *HTTPClient) {
 		if h.HTTP == nil {
-			h.HTTP = &http.Client{Timeout: 30 * time.Second}
+			h.HTTP = &http.Client{Timeout: 30 * time.Second, Transport: http1Transport()}
 		}
 		transport, ok := h.HTTP.Transport.(*http.Transport)
 		if !ok || transport == nil {
-			transport = &http.Transport{}
+			transport = http1Transport()
+		} else {
+			transport = transport.Clone()
+			applyHTTP1(transport)
 		}
-		clone := transport.Clone()
-		if clone.TLSClientConfig == nil {
-			clone.TLSClientConfig = &tls.Config{}
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{}
 		}
-		clone.TLSClientConfig = clone.TLSClientConfig.Clone()
-		clone.TLSClientConfig.InsecureSkipVerify = true
-		h.HTTP.Transport = clone
+		transport.TLSClientConfig = transport.TLSClientConfig.Clone()
+		transport.TLSClientConfig.InsecureSkipVerify = true
+		h.HTTP.Transport = transport
 	}
 }
 
@@ -93,7 +110,7 @@ func New(baseURL, username, password string, opts ...Option) *HTTPClient {
 		BaseURL:      strings.TrimRight(baseURL, "/"),
 		Username:     username,
 		Password:     password,
-		HTTP:         &http.Client{Timeout: 30 * time.Second},
+		HTTP:         &http.Client{Timeout: 30 * time.Second, Transport: http1Transport()},
 		PollInterval: time.Second,
 	}
 	for _, opt := range opts {
