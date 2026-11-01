@@ -1,0 +1,7 @@
+/bin
+/cover.out
+/cover.html
+*.exe
+.idea
+.vscode
+*.swp
