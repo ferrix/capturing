@@ -19,7 +19,7 @@ jobs:
   image-arm64:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
-    runs-on: turos-arm64
+    runs-on: turos-arm64-capturing
     permissions:
       contents: read
       packages: write

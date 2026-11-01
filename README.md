@@ -61,7 +61,7 @@ Install in-cluster:
 kubectl apply -k config/
 ```
 
-Image: `ghcr.io/ferrix/capturing` (linux/arm64 + linux/amd64). Arm64 builds on `runs-on: turos-arm64`.
+Image: `ghcr.io/ferrix/capturing` (linux/arm64 + linux/amd64). Arm64 builds on `runs-on: turos-arm64-capturing`.
 
 ## License
 
