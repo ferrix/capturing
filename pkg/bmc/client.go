@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -62,13 +63,19 @@ func WithHTTPClient(c *http.Client) Option {
 	return func(h *HTTPClient) { h.HTTP = c }
 }
 
-// http1Transport disables HTTP/2. Turing Pi BMC TLS does not advertise ALPN and
-// answers with HTTP/2 SETTINGS frames that break Go's default HTTP/1.1 parser.
+// http1Transport is a fresh Transport that never enables HTTP/2.
+// Cloning http.DefaultTransport keeps HTTP/2 from once.Do configure.
+// The Turing Pi BMC TLS stack has no ALPN and still sends HTTP/2 SETTINGS.
 func http1Transport() *http.Transport {
-	t := http.DefaultTransport.(*http.Transport).Clone()
-	t.ForceAttemptHTTP2 = false
-	t.TLSNextProto = map[string]func(authority string, c *tls.Conn) http.RoundTripper{}
-	return t
+	return &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		ForceAttemptHTTP2:     false,
+		TLSHandshakeTimeout:   10 * time.Second,
+		IdleConnTimeout:       90 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSNextProto:          map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
+	}
 }
 
 func applyHTTP1(tr *http.Transport) *http.Transport {
