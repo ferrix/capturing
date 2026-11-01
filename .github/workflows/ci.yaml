@@ -16,7 +16,28 @@ jobs:
       - name: Test and coverage
         run: make test
 
-  image:
+  image-arm64:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: turos-arm64
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push linux/arm64
+        run: |
+          docker buildx build --builder turos --platform linux/arm64 --push \
+            -t "ghcr.io/ferrix/capturing:${{ github.sha }}-arm64" \
+            -t ghcr.io/ferrix/capturing:latest-arm64 \
+            .
+
+  image-amd64:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-latest
@@ -30,14 +51,34 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: |
-            ghcr.io/ferrix/capturing:latest
-            ghcr.io/ferrix/capturing:${{ github.sha }}
+            ghcr.io/ferrix/capturing:${{ github.sha }}-amd64
+            ghcr.io/ferrix/capturing:latest-amd64
 
+  image:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [image-arm64, image-amd64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Create multi-arch tags
+        run: |
+          docker buildx imagetools create \
+            -t "ghcr.io/ferrix/capturing:${{ github.sha }}" \
+            -t ghcr.io/ferrix/capturing:latest \
+            "ghcr.io/ferrix/capturing:${{ github.sha }}-arm64" \
+            "ghcr.io/ferrix/capturing:${{ github.sha }}-amd64"
