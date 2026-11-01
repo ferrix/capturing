@@ -1,5 +1,9 @@
 name: ci
 
+concurrency:
+  group: capturing-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
